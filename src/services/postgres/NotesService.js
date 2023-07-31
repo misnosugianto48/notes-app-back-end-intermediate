@@ -3,20 +3,21 @@ const { nanoid } = require('nanoid');
 const InvariantError = require('../../exception/InvariantError');
 const { mapDBToModel } = require('../../utils');
 const NotFoundError = require('../../exception/NotFoundError');
+const AuthorizationError = require('../../exception/AuthorizationError');
 
 class NotesService {
   constructor() {
     this._pool = new Pool();
   }
 
-  async addNote({ title, body, tags }) {
+  async addNote({ title, body, tags, owner }) {
     const id = nanoid(16);
     const createdAt = new Date().toISOString();
     const updatedAt = createdAt;
 
     const query = {
-      text: 'INSERT INTO notes VALUES($1, $2, $3, $4, $5, $6) RETURNING id',
-      values: [id, title, body, tags, createdAt, updatedAt],
+      text: 'INSERT INTO notes VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      values: [id, title, body, tags, createdAt, updatedAt, owner],
     };
 
     const result = await this._pool.query(query);
@@ -27,8 +28,12 @@ class NotesService {
 
     return result.rows[0].id;
   }
-  async getNotes() {
-    const result = await this._pool.query('SELECT * FROM notes');
+  async getNotes(owner) {
+    const query = {
+      text: 'SELECT * FROM notes WHERE owner = $1',
+      values: [owner],
+    };
+    const result = await this._pool.query(query);
     return result.rows.map(mapDBToModel);
   }
   async getNoteById(id) {
@@ -68,6 +73,29 @@ class NotesService {
 
     if (!result.rows.length) {
       throw new NotFoundError('Catatan gagal dihapus. Id tidak ditemukan');
+    }
+  }
+
+  async verifyNoteOwner(id, owner) {
+    //  kueri untuk mendapatkan objek note sesuai id
+    const query = {
+      text: 'SELECT * FROM notes WHERE id = $1',
+      values: [id],
+    };
+
+    const result = await this._pool.query(query);
+
+    // bila objek note tidak ditemukan, maka throw NotFoundError
+    if (!result.rows.length) {
+      throw new NotFoundError('Catatan tidak ditemukan');
+    }
+
+    // bila ditemukan, lakukan pengecekan kesesuaian owner-nya
+    const note = result.rows[0];
+
+    // bila owner tidak sesuai, maka throw AuthorizationError
+    if (note.owner !== owner) {
+      throw new AuthorizationError('Anda tidak berhak mengakses resource ini');
     }
   }
 }
