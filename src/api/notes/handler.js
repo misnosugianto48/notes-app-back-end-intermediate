@@ -70,8 +70,8 @@ class NotesHandler {
     try {
       const { id } = request.params;
       const { id: credentialId } = request.auth.credentials;
-
-      await this._service.verifyNoteOwner(id, credentialId);
+ 
+      await this._service.verifyNoteAccess(id, credentialId);
       const note = await this._service.getNoteById(id);
       return {
         status: 'success',
@@ -88,7 +88,7 @@ class NotesHandler {
         response.code(error.statusCode);
         return response;
       }
-
+ 
       // Server ERROR!
       const response = h.response({
         status: 'error',
@@ -99,18 +99,15 @@ class NotesHandler {
       return response;
     }
   }
-
+ 
   async putNoteByIdHandler(request, h) {
     try {
       this._validator.validateNotePayload(request.payload);
-      const { title, body, tags } = request.payload;
       const { id } = request.params;
       const { id: credentialId } = request.auth.credentials;
-
-      // Panggil fungsi verifyNoteOwner sebelum pemanggilan fungsi getNoteById
-      await this._service.verifyNoteOwner(id, credentialId);
-      await this._service.editNoteById(id, { title, body, tags });
-
+ 
+      await this._service.verifyNoteAccess(id, credentialId);
+      await this._service.editNoteById(id, request.payload);
       return {
         status: 'success',
         message: 'Catatan berhasil diperbarui',
@@ -124,7 +121,7 @@ class NotesHandler {
         response.code(error.statusCode);
         return response;
       }
-
+ 
       // Server ERROR!
       const response = h.response({
         status: 'error',
