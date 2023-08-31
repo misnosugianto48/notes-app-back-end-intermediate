@@ -1,28 +1,30 @@
 const { Pool } = require('pg');
 const { nanoid } = require('nanoid');
 const InvariantError = require('../../exception/InvariantError');
- 
+
 class CollaborationsService {
-  constructor() {
+  constructor(cacheService) {
     this._pool = new Pool();
+    this.cacheService = cacheService;
   }
 
   async addCollaboration(noteId, userId) {
     //  ciptakan prefix id
-    const id = `collab-${nanoid(16)}`
+    const id = `collab-${nanoid(16)}`;
 
     const query = {
       text: 'INSERT INTO collaborations VALUES($1, $2, $3) RETURNING id',
-      values: [id, noteId, userId]
-    }
+      values: [id, noteId, userId],
+    };
 
-    const result = await this._pool.query(query)
-    
+    const result = await this._pool.query(query);
+
     if (!result.rows.length) {
-      throw new InvariantError('Kolaborasi gagal ditambahkan')
+      throw new InvariantError('Kolaborasi gagal ditambahkan');
     }
 
-    return result.rows[0].id
+    await this._cacheService.delete(`notes:${userId}`);
+    return result.rows[0].id;
   }
 
   async deleteCollaboration(noteId, userId) {
@@ -36,6 +38,8 @@ class CollaborationsService {
     if (!result.rows.length) {
       throw new InvariantError('Kolaborasi gagal dihapus');
     }
+
+    await this._cacheService.delete(`notes:${userId}`);
   }
 
   async verifyCollaborator(noteId, userId) {
